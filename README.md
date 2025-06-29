@@ -1,318 +1,282 @@
 # 🎵 YouTube Playlist Creator
 
-Create YouTube playlists automatically from CSV files containing song titles and artists.
+**Automatically create YouTube playlists from CSV files** containing song titles and artists. Perfect for converting your music lists, Spotify exports, or any song collection into YouTube playlists.
 
-## ✨ Features
+## 🎯 What This Does
 
-- **CSV Import**: Upload CSV files with song titles and artists
-- **Automatic Search**: Find matching YouTube videos for each song
-- **Playlist Creation**: Create playlists with customizable privacy settings
-- **Duplicate Detection**: Automatically skip duplicate videos
-- **CLI Interface**: Command-line tools for power users
-- **REST API**: Web API for integration with other applications
-- **Preview Mode**: Preview CSV contents before processing
-- **Comprehensive Logging**: Detailed logs for troubleshooting
+1. **Upload a CSV** with song titles and artists
+2. **Automatically searches** YouTube for matching videos  
+3. **Creates a playlist** with all found songs
+4. **Handles duplicates** and provides detailed results
 
-## 🚀 Quick Start
+## 🔑 Required API Access
 
-### Prerequisites
+You need a **Google Cloud API Key** with **YouTube Data API v3** enabled.
 
-- Python 3.9+ (tested with Python 3.13.2)
-- YouTube Data API v3 key
-- macOS (optimized for macOS development)
+### ✅ Your API Setup
+Since you mentioned you have a `GOOGLE_CLOUD_API_KEY` with these APIs enabled:
+- ✅ **YouTube Data API v3** ← **This is what we need!**
+- ✅ Custom Search API _(not used by this project)_
+- ✅ Gemini for Google Cloud API _(not used by this project)_
+- ✅ Generative Language API _(not used by this project)_
 
-### Installation
+**You're all set!** This project only needs YouTube Data API v3, which you already have.
 
-1. **Clone and setup:**
-   ```bash
-   git clone <repository-url>
-   cd youtube-playlist-creator
-   make setup
-   ```
+## 🚀 Quick Start (5 minutes)
 
-2. **Activate virtual environment:**
-   ```bash
-   source venv/bin/activate
-   ```
-
-3. **Configure API key:**
-   Edit `.env` file and add your YouTube API key:
-   ```
-   YOUTUBE_API_KEY=your_actual_api_key_here
-   ```
-
-4. **Test installation:**
-   ```bash
-   make test-services
-   ```
-
-## 📁 Project Structure
-
-```
-youtube-playlist-creator/
-├── venv/                    # Virtual environment
-├── csv_files/              # CSV files for processing
-│   ├── .gitkeep           
-│   └── sample.csv         # Sample CSV for testing
-├── app/
-│   ├── __init__.py
-│   ├── main.py            # FastAPI application
-│   ├── cli.py             # CLI interface
-│   ├── services/
-│   │   ├── csv_parser.py  # CSV parsing logic
-│   │   ├── youtube_api.py # YouTube API integration
-│   │   └── playlist_creator.py # Main orchestration
-│   ├── models/
-│   │   └── schemas.py     # Data models
-│   └── utils/
-├── tests/                  # Test files
-├── logs/                   # Application logs
-├── scripts/
-│   └── dev.sh             # Development helper script
-├── config.py              # Configuration management
-├── requirements.txt       # Python dependencies
-├── Makefile              # Development commands
-├── .env                  # Environment variables
-└── README.md
-```
-
-## 🖥️ Usage
-
-### CLI Interface
-
-**List available CSV files:**
+### 1. Clone and Setup
 ```bash
+git clone <repository-url>
+cd youtube-playlist-creator
+make setup
+source venv/bin/activate
+```
+
+### 2. Add Your API Key
+Create a `.env` file:
+```bash
+echo "GOOGLE_CLOUD_API_KEY=your_actual_api_key_here" > .env
+```
+
+### 3. Test Everything Works
+```bash
+make test-services
+```
+
+### 4. Create Your First Playlist
+```bash
+# Preview the sample CSV
+python -m app.cli preview --file sample.csv
+
+# Create a playlist (demo mode - won't actually create)
+python -m app.cli create --file sample.csv --playlist-name "My Test Playlist" --demo
+```
+
+## 💡 Two Ways to Use This
+
+### Option 1: Command Line (CLI) 
+**Best for: Personal use, batch processing**
+
+```bash
+# List available CSV files
 python -m app.cli create --list-files
+
+# Create playlist from CSV
+python -m app.cli create --file your_songs.csv --playlist-name "My Playlist"
+
+# Preview CSV before processing
+python -m app.cli preview --file your_songs.csv --rows 10
 ```
 
-**Create playlist from CSV:**
-```bash
-python -m app.cli create --file sample.csv --playlist-name "My Awesome Playlist"
-```
+### Option 2: Web API 
+**Best for: Integration with other apps, web interfaces**
 
-**Preview CSV file:**
 ```bash
-python -m app.cli preview --file sample.csv --rows 10
-```
-
-**Test all services:**
-```bash
-python -m app.cli test
-```
-
-### REST API
-
-**Start the API server:**
-```bash
+# Start the web server
 make run-api
-# or
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Opens at http://localhost:3000
 ```
-
-**API Documentation:**
-Visit `http://localhost:3000/docs` for interactive API documentation.
 
 **Key endpoints:**
-- `GET /` - API information
-- `GET /list-csv-files` - List available CSV files
-- `GET /preview-csv` - Preview CSV contents
+- `GET /docs` - Interactive API documentation
 - `POST /upload-csv` - Upload and process CSV file
+- `GET /preview-csv` - Preview CSV contents
 - `POST /create-from-csv-folder` - Process CSV from csv_files folder
-- `GET /health` - Health check
-
-### Development Helper Script
-
-```bash
-# Start API server
-./scripts/dev.sh api
-
-# List CSV files
-./scripts/dev.sh list
-
-# Create playlist
-./scripts/dev.sh create sample.csv
-
-# Test services
-./scripts/dev.sh test
-```
 
 ## 📄 CSV Format
 
-Your CSV file must have these columns:
-- `Title`: Song title
-- `Artist`: Artist name
-
-Example:
+Your CSV file needs these two columns:
 ```csv
 Title,Artist
 Shape of You,Ed Sheeran
 Blinding Lights,The Weeknd
 Bohemian Rhapsody,Queen
+Hotel California,Eagles
 ```
 
-## ⚙️ Configuration
+**That's it!** Put your CSV files in the `csv_files/` folder or upload them via the API.
 
-Edit `.env` file to configure:
+## 🎯 Complete Example Walkthrough
 
+**1. Prepare your songs list:**
+```csv
+Title,Artist
+Imagine,John Lennon
+Sweet Child O' Mine,Guns N' Roses
+Bohemian Rhapsody,Queen
+Stairway to Heaven,Led Zeppelin
+```
+
+**2. Save as `my_playlist.csv` in the `csv_files/` folder**
+
+**3. Test in demo mode first:**
+```bash
+python -m app.cli create --file my_playlist.csv --playlist-name "Classic Rock" --demo
+```
+
+**4. If results look good, create the actual playlist:**
+```bash
+python -m app.cli create --file my_playlist.csv --playlist-name "Classic Rock"
+```
+
+**5. Results:**
+```
+🎉 PLAYLIST CREATION COMPLETE!
+==================================================
+📋 Playlist: Classic Rock
+🔗 URL: https://www.youtube.com/playlist?list=PLxxxxxx
+📊 Total songs processed: 4
+✅ Successfully added: 4
+❌ Not found: 0
+🔄 Duplicates skipped: 0
+```
+
+## 🔧 Configuration Options
+
+Edit `.env` file to customize:
 ```env
-YOUTUBE_API_KEY=your_youtube_api_key_here
+GOOGLE_CLOUD_API_KEY=your_key_here
 LOG_LEVEL=INFO
 MAX_SEARCH_RESULTS=5
 DEFAULT_PLAYLIST_PRIVACY=private
 ```
 
-## 🔧 Development
+**Privacy options:** `private`, `public`, `unlisted`
 
-**Available make commands:**
-```bash
-make setup        # Initial setup
-make install      # Install dependencies
-make run-api      # Start API server
-make run-cli      # Show CLI help
-make test-cli     # Test with sample CSV
-make test         # Run tests
-make clean        # Clean cache files
-make help         # Show all commands
-```
+## 🔐 OAuth2 Setup (For Playlist Creation)
 
-**Development workflow:**
-1. Activate virtual environment: `source venv/bin/activate`
-2. Make changes to code
-3. Test with: `./scripts/dev.sh test`
-4. Run API: `./scripts/dev.sh api`
-5. Test CLI: `./scripts/dev.sh create sample.csv`
+### Why do I need OAuth2?
+- **API Key**: Can search YouTube videos ✅
+- **OAuth2**: Required to create playlists in your account ✅
 
-## 🔑 Getting YouTube API Key
+### Simple OAuth Setup
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
-3. Enable YouTube Data API v3
-4. Create credentials (API Key)
-5. Add the key to your `.env` file
+**For CLI usage (recommended for personal use):**
 
-## 🔐 OAuth2 Authentication Setup
-
-**This project now supports OAuth2 authentication for creating playlists!**
-
-### Why OAuth2?
-- **API Key**: Only allows searching YouTube (read-only)
-- **OAuth2**: Required for creating playlists, adding videos (write access)
-
-### Quick Setup
-
-1. **Run the setup script:**
+1. **Run the setup helper:**
    ```bash
    python setup_oauth.py
    ```
 
-2. **Follow the guided setup:**
-   - Check credential files
-   - Run OAuth tests
-   - Verify integration
+2. **Follow the prompts:**
+   - Creates OAuth credentials in Google Cloud Console
+   - Downloads `client_secrets.json` file
+   - Tests the authentication flow
 
-### Manual Setup
-
-1. **Create OAuth2 credentials in Google Cloud Console:**
-   - Desktop application for CLI usage
-   - Web application for API endpoints
-
-2. **Download credential files:**
-   - `client_secrets.json` (Desktop OAuth)
-   - `web_client_secrets.json` (Web OAuth)
-
-3. **Test your setup:**
+3. **Test it works:**
    ```bash
-   python test_desktop_oauth.py    # Test CLI OAuth
-   python test_web_oauth.py        # Test API OAuth
-   python test_full_integration.py # Test everything
+   python test_desktop_oauth.py
    ```
 
-### Detailed Instructions
+**For Web API usage:**
+- See `OAUTH_SETUP_GUIDE.md` for detailed web OAuth setup
 
-**👉 See `OAUTH_SETUP_GUIDE.md` for complete step-by-step instructions.**
+### Manual OAuth Setup (if helper fails)
 
-**Required files after setup:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create OAuth 2.0 Client ID → Desktop Application
+3. Download as `client_secrets.json`
+4. Place in project root
+
+## 🔧 Development & Advanced Usage
+
+### Available Commands
+```bash
+make setup        # Complete setup
+make run-api      # Start web server
+make test-cli     # Test with sample data
+make clean        # Clean cache files
+make help         # Show all commands
+```
+
+### Helper Script
+```bash
+./scripts/dev.sh api      # Start API server
+./scripts/dev.sh list     # List CSV files  
+./scripts/dev.sh create   # Create test playlist
+./scripts/dev.sh test     # Test all services
+```
+
+### File Structure
 ```
 youtube-playlist-creator/
-├── client_secrets.json          # Desktop OAuth (for CLI)
-├── web_client_secrets.json      # Web OAuth (for API)
-├── test_desktop_oauth.py        # Test scripts
-├── test_web_oauth.py
-├── test_full_integration.py
-└── OAUTH_SETUP_GUIDE.md         # Complete setup guide
-```
-
-## 🎯 Example Usage
-
-**1. Prepare your CSV file:**
-```csv
-Title,Artist
-Imagine,John Lennon
-Hotel California,Eagles
-Bohemian Rhapsody,Queen
-```
-
-**2. Place it in csv_files folder:**
-```bash
-cp my_songs.csv csv_files/
-```
-
-**3. Create playlist:**
-```bash
-python -m app.cli create --file my_songs.csv --playlist-name "Classic Rock Hits"
-```
-
-**4. Results:**
-```
-🎉 PLAYLIST CREATION COMPLETE!
-==================================================
-📋 Playlist: Classic Rock Hits
-🔗 URL: https://www.youtube.com/playlist?list=PLxxxxxx
-📊 Total songs processed: 3
-✅ Successfully added: 3
-❌ Not found: 0
-🔄 Duplicates skipped: 0
+├── csv_files/              # Put your CSV files here
+│   └── sample.csv         # Example file included
+├── app/
+│   ├── main.py            # FastAPI web server
+│   ├── cli.py             # Command line interface
+│   └── services/          # Core logic
+├── client_secrets.json    # OAuth credentials (you create this)
+├── .env                   # Your API key goes here
+└── README.md
 ```
 
 ## 🐛 Troubleshooting
 
-**Common issues:**
+### Common Issues
 
-1. **API Key Error**: Ensure your YouTube API key is valid and has YouTube Data API v3 enabled
-2. **CSV Format Error**: Check that your CSV has 'Title' and 'Artist' columns
-3. **Song Not Found**: Some songs might not be available on YouTube or have different titles
-4. **Quota Exceeded**: YouTube API has daily quotas; wait until reset or upgrade quota
+**❌ "API key invalid"**
+- Check your `.env` file has the correct `GOOGLE_CLOUD_API_KEY`
+- Verify YouTube Data API v3 is enabled in Google Cloud Console
 
-**Debug mode:**
-Set `LOG_LEVEL=DEBUG` in `.env` for detailed logging.
+**❌ "Songs not found"**  
+- Try different search terms (some songs have alternate titles)
+- Check if songs are available on YouTube
+- Use `--demo` mode to see search results first
 
-## 📊 Performance
+**❌ "Can't create playlist"**
+- You need OAuth2 setup for playlist creation
+- Run `python setup_oauth.py` to set up authentication
 
-- Average processing time: ~2-5 seconds per song
-- Success rate: ~85-95% depending on song popularity
-- API quota usage: ~100 units per song search + playlist operations
+**❌ "Quota exceeded"**
+- YouTube API has daily limits
+- Wait 24 hours for quota reset, or upgrade your Google Cloud quota
+
+### Debug Mode
+```bash
+# Enable detailed logging
+echo "LOG_LEVEL=DEBUG" >> .env
+
+# Check logs
+tail -f logs/app.log
+```
+
+## 📊 Performance & Limits
+
+- **Processing speed**: ~2-5 seconds per song
+- **Success rate**: ~85-95% (depends on song popularity)
+- **API quota usage**: ~100 units per song + playlist operations
+- **Daily limit**: YouTube API default is 10,000 units/day (~100 songs)
+
+## ❓ FAQ
+
+**Q: Do I need to pay for anything?**
+A: No, Google Cloud API usage is free up to daily quotas (plenty for personal use).
+
+**Q: Can I make playlists private?**  
+A: Yes! Set `DEFAULT_PLAYLIST_PRIVACY=private` in `.env` file.
+
+**Q: What if a song isn't found?**
+A: The tool will skip it and report which songs couldn't be found. You can manually add them later.
+
+**Q: Can I use Spotify CSV exports?**
+A: Yes! Just make sure your CSV has `Title` and `Artist` columns.
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create feature branch: `git checkout -b feature/new-feature`
+2. Create feature branch: `git checkout -b feature/new-feature`  
 3. Commit changes: `git commit -am 'Add new feature'`
 4. Push to branch: `git push origin feature/new-feature`
 5. Create Pull Request
 
 ## 📝 License
 
-This project is licensed under the MIT License.
-
-## 🙏 Acknowledgments
-
-- YouTube Data API v3
-- FastAPI framework
-- Click CLI library
-- Pandas for CSV processing
+MIT License - feel free to use for personal or commercial projects.
 
 ## 📞 Support
 
-- Create an issue for bugs or feature requests
-- Check logs in `logs/` folder for debugging
-- Use `make test-services` to diagnose issues
+- **Issues**: Create a GitHub issue
+- **Logs**: Check `logs/` folder for debugging
+- **Test**: Use `make test-services` to diagnose problems
+- **Documentation**: See `OAUTH_SETUP_GUIDE.md` for detailed OAuth setup

@@ -56,9 +56,9 @@ class YouTubeAPIService:
                         logger.info("YouTube API service initialized with default Desktop OAuth2")
             else:
                 # Use API key for read-only operations
-                if not Config.YOUTUBE_API_KEY:
+                if not Config.GOOGLE_CLOUD_API_KEY:
                     raise ValueError("YouTube API key is required when not using OAuth2")
-                self.youtube = build('youtube', 'v3', developerKey=Config.YOUTUBE_API_KEY)
+                self.youtube = build('youtube', 'v3', developerKey=Config.GOOGLE_CLOUD_API_KEY)
                 logger.info("YouTube API service initialized with API key")
         except Exception as e:
             logger.error(f"Failed to initialize YouTube API service: {e}")

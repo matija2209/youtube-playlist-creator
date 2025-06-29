@@ -13,7 +13,7 @@ class Config:
     LOGS_FOLDER = PROJECT_ROOT / "logs"
     
     # YouTube API
-    YOUTUBE_API_KEY: str = os.getenv("YOUTUBE_API_KEY", "")
+    GOOGLE_CLOUD_API_KEY: str = os.getenv("GOOGLE_CLOUD_API_KEY", "")
     MAX_SEARCH_RESULTS: int = int(os.getenv("MAX_SEARCH_RESULTS", "5"))
     
     # Playlist defaults
@@ -28,8 +28,8 @@ class Config:
     @classmethod
     def validate(cls):
         """Validate required configuration"""
-        if not cls.YOUTUBE_API_KEY:
-            raise ValueError("YOUTUBE_API_KEY environment variable is required")
+        if not cls.GOOGLE_CLOUD_API_KEY:
+            raise ValueError("GOOGLE_CLOUD_API_KEY environment variable is required")
         
         # Create necessary directories
         cls.CSV_FOLDER.mkdir(exist_ok=True)

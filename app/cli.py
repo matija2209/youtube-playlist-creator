@@ -184,7 +184,7 @@ def setup():
         click.echo(f"📄 Available CSV files: {len(Config.get_csv_files())}")
         
         # Check if API key is set
-        if Config.YOUTUBE_API_KEY == "your_youtube_api_key_here":
+        if Config.GOOGLE_CLOUD_API_KEY == "your_GOOGLE_CLOUD_API_KEY_here":
             click.echo("⚠️ Warning: Please set your YouTube API key in .env file")
         else:
             click.echo("✅ YouTube API key is configured")

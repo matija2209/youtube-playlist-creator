@@ -116,7 +116,7 @@ youtube-playlist-creator/
 2. **Configure API Key**:
    Edit `.env` file and add your YouTube API key:
    ```
-   YOUTUBE_API_KEY=your_actual_api_key_here
+   GOOGLE_CLOUD_API_KEY=your_actual_api_key_here
    ```
 
 3. **Verify Installation**:
