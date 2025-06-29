@@ -13,14 +13,11 @@
 
 You need a **Google Cloud API Key** with **YouTube Data API v3** enabled.
 
-### ✅ Your API Setup
-Since you mentioned you have a `GOOGLE_CLOUD_API_KEY` with these APIs enabled:
-- ✅ **YouTube Data API v3** ← **This is what we need!**
-- ✅ Custom Search API _(not used by this project)_
-- ✅ Gemini for Google Cloud API _(not used by this project)_
-- ✅ Generative Language API _(not used by this project)_
+### ✅ API Requirements
+This project only requires:
+- ✅ **YouTube Data API v3** - For searching videos and creating playlists
 
-**You're all set!** This project only needs YouTube Data API v3, which you already have.
+**You're all set!** Make sure YouTube Data API v3 is enabled in your Google Cloud Console.
 
 ## 🚀 Quick Start (5 minutes)
 
