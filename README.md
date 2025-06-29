@@ -110,7 +110,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **API Documentation:**
-Visit `http://localhost:8000/docs` for interactive API documentation.
+Visit `http://localhost:3000/docs` for interactive API documentation.
 
 **Key endpoints:**
 - `GET /` - API information
@@ -189,6 +189,58 @@ make help         # Show all commands
 3. Enable YouTube Data API v3
 4. Create credentials (API Key)
 5. Add the key to your `.env` file
+
+## 🔐 OAuth2 Authentication Setup
+
+**This project now supports OAuth2 authentication for creating playlists!**
+
+### Why OAuth2?
+- **API Key**: Only allows searching YouTube (read-only)
+- **OAuth2**: Required for creating playlists, adding videos (write access)
+
+### Quick Setup
+
+1. **Run the setup script:**
+   ```bash
+   python setup_oauth.py
+   ```
+
+2. **Follow the guided setup:**
+   - Check credential files
+   - Run OAuth tests
+   - Verify integration
+
+### Manual Setup
+
+1. **Create OAuth2 credentials in Google Cloud Console:**
+   - Desktop application for CLI usage
+   - Web application for API endpoints
+
+2. **Download credential files:**
+   - `client_secrets.json` (Desktop OAuth)
+   - `web_client_secrets.json` (Web OAuth)
+
+3. **Test your setup:**
+   ```bash
+   python test_desktop_oauth.py    # Test CLI OAuth
+   python test_web_oauth.py        # Test API OAuth
+   python test_full_integration.py # Test everything
+   ```
+
+### Detailed Instructions
+
+**👉 See `OAUTH_SETUP_GUIDE.md` for complete step-by-step instructions.**
+
+**Required files after setup:**
+```
+youtube-playlist-creator/
+├── client_secrets.json          # Desktop OAuth (for CLI)
+├── web_client_secrets.json      # Web OAuth (for API)
+├── test_desktop_oauth.py        # Test scripts
+├── test_web_oauth.py
+├── test_full_integration.py
+└── OAUTH_SETUP_GUIDE.md         # Complete setup guide
+```
 
 ## 🎯 Example Usage
 

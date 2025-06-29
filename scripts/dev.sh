@@ -20,8 +20,8 @@ check_venv() {
 start_api() {
     check_venv
     echo -e "${GREEN}🚀 Starting FastAPI server...${NC}"
-    echo -e "${YELLOW}API Documentation: http://localhost:8000/docs${NC}"
-    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    echo -e "${YELLOW}API Documentation: http://localhost:3000/docs${NC}"
+    uvicorn app.main:app --reload --host 0.0.0.0 --port 3000
 }
 
 # Function to show CLI help

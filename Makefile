@@ -14,7 +14,7 @@ install:
 
 # Run FastAPI development server
 run-api:
-	source venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	source venv/bin/activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 3000
 
 # Run CLI commands
 run-cli:

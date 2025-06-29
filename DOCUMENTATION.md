@@ -145,9 +145,9 @@ python -m app.cli test
 uvicorn app.main:app --reload
 
 # Test endpoints
-curl http://localhost:8000/health
-curl http://localhost:8000/list-csv-files
-curl "http://localhost:8000/preview-csv?filename=sample.csv"
+curl http://localhost:3000/health
+curl http://localhost:3000/list-csv-files
+curl "http://localhost:3000/preview-csv?filename=sample.csv"
 ```
 
 ### Development Helper

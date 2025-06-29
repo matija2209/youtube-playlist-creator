@@ -22,8 +22,8 @@ class YouTubeVideo:
 class PlaylistSummary(BaseModel):
     """Summary of playlist creation results"""
     playlist_name: str
-    playlist_url: str
-    playlist_id: str
+    playlist_url: Optional[str] = None  # Optional for demo mode
+    playlist_id: Optional[str] = None   # Optional for demo mode
     total_songs: int
     added_count: int
     not_found_count: int

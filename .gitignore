@@ -46,3 +46,11 @@ htmlcov/
 # Temporary files
 *.tmp
 temp/
+
+# OAuth credentials and tokens
+client_secrets.json
+web_client_secrets.json
+token.json
+web_token.json
+credentials.json
+*.token

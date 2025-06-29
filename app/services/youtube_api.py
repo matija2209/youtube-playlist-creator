@@ -1,135 +1,220 @@
-import googleapiclient.discovery
-import googleapiclient.errors
-from typing import List, Optional
-from ..models.schemas import Song, YouTubeVideo
-from config import Config
+"""
+YouTube API Service - handles YouTube Data API v3 operations
+"""
 import logging
+from typing import List, Optional, Dict, Any
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from google.oauth2.credentials import Credentials
+
+from app.services.oauth_service import YouTubeOAuthService
+from app.services.web_oauth_service import YouTubeWebOAuthService
+from config import Config
 
 logger = logging.getLogger(__name__)
 
 class YouTubeAPIService:
     """Service for interacting with YouTube Data API v3"""
     
-    def __init__(self):
-        self.api_service_name = "youtube"
-        self.api_version = "v3"
-        self.api_key = Config.YOUTUBE_API_KEY
-        
-        if not self.api_key:
-            raise ValueError("YouTube API key is required")
-        
-        # Build the YouTube service
-        self.youtube = googleapiclient.discovery.build(
-            self.api_service_name, 
-            self.api_version, 
-            developerKey=self.api_key
-        )
-        logger.info("YouTube API service initialized")
-    
-    def search_video(self, song: Song) -> Optional[YouTubeVideo]:
+    def __init__(self, use_oauth: bool = False, oauth_service: Optional[YouTubeOAuthService] = None, web_oauth_service: Optional[YouTubeWebOAuthService] = None):
         """
-        Search for a video based on song title and artist
+        Initialize YouTube API service
         
         Args:
-            song: Song object with title and artist
+            use_oauth: Whether to use OAuth2 authentication (required for playlist creation)
+            oauth_service: Optional OAuth service instance
+        """
+        self.use_oauth = use_oauth
+        self.oauth_service = oauth_service
+        self.web_oauth_service = web_oauth_service
+        self.youtube = None
+        self._initialize_service()
+    
+    def _initialize_service(self):
+        """Initialize YouTube API service with appropriate authentication"""
+        try:
+            if self.use_oauth:
+                # Prefer web OAuth service for web apps, fallback to desktop OAuth
+                if self.web_oauth_service:
+                    self.youtube = self.web_oauth_service.get_youtube_service()
+                    logger.info("YouTube API service initialized with Web OAuth2")
+                elif self.oauth_service:
+                    self.youtube = self.oauth_service.get_youtube_service()
+                    logger.info("YouTube API service initialized with Desktop OAuth2")
+                else:
+                    # Create default services - try web first, then desktop
+                    try:
+                        self.web_oauth_service = YouTubeWebOAuthService()
+                        if self.web_oauth_service.is_authenticated():
+                            self.youtube = self.web_oauth_service.get_youtube_service()
+                            logger.info("YouTube API service initialized with default Web OAuth2")
+                        else:
+                            raise Exception("Web OAuth not authenticated")
+                    except:
+                        self.oauth_service = YouTubeOAuthService()
+                        self.youtube = self.oauth_service.get_youtube_service()
+                        logger.info("YouTube API service initialized with default Desktop OAuth2")
+            else:
+                # Use API key for read-only operations
+                if not Config.YOUTUBE_API_KEY:
+                    raise ValueError("YouTube API key is required when not using OAuth2")
+                self.youtube = build('youtube', 'v3', developerKey=Config.YOUTUBE_API_KEY)
+                logger.info("YouTube API service initialized with API key")
+        except Exception as e:
+            logger.error(f"Failed to initialize YouTube API service: {e}")
+            raise
+    
+    def search_videos(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+        """
+        Search for videos on YouTube
+        
+        Args:
+            query: Search query string
+            max_results: Maximum number of results to return
             
         Returns:
-            YouTubeVideo object if found, None otherwise
+            List of video dictionaries with id, title, description, channel
         """
         try:
-            # Create search query
-            query = f"{song.title} {song.artist}"
-            logger.debug(f"Searching for: {query}")
+            logger.info(f"Searching YouTube for: '{query}'")
             
-            # Search for videos
-            search_response = self.youtube.search().list(
+            request = self.youtube.search().list(
+                part="snippet",
                 q=query,
-                part="id,snippet",
-                maxResults=Config.MAX_SEARCH_RESULTS,
-                type="video"
-            ).execute()
+                type="video",
+                maxResults=max_results,
+                order="relevance"
+            )
             
-            # Process search results
-            for item in search_response.get("items", []):
-                video_id = item["id"]["videoId"]
-                title = item["snippet"]["title"]
-                channel_title = item["snippet"]["channelTitle"]
-                description = item["snippet"]["description"]
-                
-                # Basic relevance check - if song title appears in video title
-                if (song.title.lower() in title.lower() or 
-                    song.artist.lower() in title.lower() or
-                    song.artist.lower() in channel_title.lower()):
-                    
-                    video = YouTubeVideo(
-                        video_id=video_id,
-                        title=title,
-                        channel_title=channel_title,
-                        description=description
-                    )
-                    logger.info(f"Found video for '{song}': {title}")
-                    return video
+            response = request.execute()
+            videos = []
             
-            logger.warning(f"No suitable video found for: {song}")
-            return None
+            for item in response.get('items', []):
+                video = {
+                    'id': item['id']['videoId'],
+                    'title': item['snippet']['title'],
+                    'description': item['snippet']['description'],
+                    'channel': item['snippet']['channelTitle'],
+                    'published_at': item['snippet']['publishedAt']
+                }
+                videos.append(video)
             
-        except googleapiclient.errors.HttpError as e:
-            logger.error(f"YouTube API error searching for '{song}': {e}")
-            return None
+            logger.info(f"Found {len(videos)} videos for query: '{query}'")
+            return videos
+            
+        except HttpError as e:
+            logger.error(f"YouTube API error for query '{query}': {e}")
+            return []
         except Exception as e:
-            logger.error(f"Unexpected error searching for '{song}': {e}")
-            return None
+            logger.error(f"Unexpected error searching for '{query}': {e}")
+            return []
     
-    def create_playlist(self, title: str, description: str = "", privacy_status: str = "private") -> Optional[str]:
+    def find_best_match(self, title: str, artist: str, max_results: int = 5) -> Optional[Dict[str, Any]]:
         """
-        Create a new YouTube playlist
+        Find the best matching video for a song
+        
+        Args:
+            title: Song title
+            artist: Artist name
+            max_results: Maximum search results to consider
+            
+        Returns:
+            Best matching video dictionary or None if not found
+        """
+        # Try different search queries to find the best match
+        search_queries = [
+            f"{title} {artist}",
+            f"{artist} {title}",
+            f"{title} by {artist}",
+            f"{artist} - {title}",
+            f'"{title}" "{artist}"'
+        ]
+        
+        for query in search_queries:
+            videos = self.search_videos(query, max_results)
+            
+            if videos:
+                # Simple scoring: prefer videos with both title and artist in the name
+                for video in videos:
+                    video_title_lower = video['title'].lower()
+                    title_lower = title.lower()
+                    artist_lower = artist.lower()
+                    
+                    if title_lower in video_title_lower and artist_lower in video_title_lower:
+                        logger.info(f"Found video for '{title} by {artist}': {video['title']}")
+                        return video
+                
+                # If no perfect match, return the first result
+                logger.info(f"Found video for '{title} by {artist}': {videos[0]['title']}")
+                return videos[0]
+        
+        logger.warning(f"No suitable video found for: {title} by {artist}")
+        return None
+    
+    def create_playlist(self, title: str, description: str = "", privacy: str = "private") -> Optional[str]:
+        """
+        Create a new YouTube playlist (requires OAuth2)
         
         Args:
             title: Playlist title
             description: Playlist description
-            privacy_status: Playlist privacy (private, public, unlisted)
+            privacy: Playlist privacy setting (private, public, unlisted)
             
         Returns:
             Playlist ID if successful, None otherwise
         """
+        if not self.use_oauth:
+            logger.error("OAuth2 authentication required for playlist creation")
+            raise ValueError("OAuth2 authentication required for playlist creation")
+        
         try:
-            playlists_insert_response = self.youtube.playlists().insert(
+            logger.info(f"Creating playlist: '{title}'")
+            
+            request = self.youtube.playlists().insert(
                 part="snippet,status",
                 body={
                     "snippet": {
                         "title": title,
-                        "description": description
+                        "description": description,
+                        "tags": ["music", "playlist", "created-by-youtube-playlist-creator"],
+                        "defaultLanguage": "en"
                     },
                     "status": {
-                        "privacyStatus": privacy_status
+                        "privacyStatus": privacy
                     }
                 }
-            ).execute()
+            )
             
-            playlist_id = playlists_insert_response["id"]
-            logger.info(f"Created playlist '{title}' with ID: {playlist_id}")
+            response = request.execute()
+            playlist_id = response['id']
+            
+            logger.info(f"Successfully created playlist '{title}' with ID: {playlist_id}")
             return playlist_id
             
-        except googleapiclient.errors.HttpError as e:
+        except HttpError as e:
             logger.error(f"YouTube API error creating playlist '{title}': {e}")
-            return None
+            raise Exception(f"Failed to create YouTube playlist: {e}")
         except Exception as e:
             logger.error(f"Unexpected error creating playlist '{title}': {e}")
-            return None
+            raise Exception(f"Failed to create YouTube playlist: {e}")
     
     def add_video_to_playlist(self, playlist_id: str, video_id: str) -> bool:
         """
-        Add a video to a playlist
+        Add a video to a playlist (requires OAuth2)
         
         Args:
-            playlist_id: YouTube playlist ID
-            video_id: YouTube video ID
+            playlist_id: Target playlist ID
+            video_id: Video ID to add
             
         Returns:
             True if successful, False otherwise
         """
+        if not self.use_oauth:
+            logger.error("OAuth2 authentication required for playlist modification")
+            raise ValueError("OAuth2 authentication required for playlist modification")
+        
         try:
-            self.youtube.playlistItems().insert(
+            request = self.youtube.playlistItems().insert(
                 part="snippet",
                 body={
                     "snippet": {
@@ -140,54 +225,42 @@ class YouTubeAPIService:
                         }
                     }
                 }
-            ).execute()
+            )
             
-            logger.debug(f"Added video {video_id} to playlist {playlist_id}")
+            response = request.execute()
+            logger.info(f"Added video {video_id} to playlist {playlist_id}")
             return True
             
-        except googleapiclient.errors.HttpError as e:
-            # Check if it's a duplicate error
-            if "videoAlreadyInPlaylist" in str(e):
-                logger.info(f"Video {video_id} already in playlist {playlist_id}")
-                return False  # Indicate this was a duplicate
-            else:
-                logger.error(f"YouTube API error adding video to playlist: {e}")
-                return False
+        except HttpError as e:
+            logger.error(f"YouTube API error adding video {video_id} to playlist {playlist_id}: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Unexpected error adding video to playlist: {e}")
+            logger.error(f"Unexpected error adding video {video_id} to playlist {playlist_id}: {e}")
             return False
     
     def get_playlist_url(self, playlist_id: str) -> str:
         """
-        Generate playlist URL from playlist ID
+        Generate YouTube playlist URL
         
         Args:
-            playlist_id: YouTube playlist ID
+            playlist_id: Playlist ID
             
         Returns:
-            Full YouTube playlist URL
+            YouTube playlist URL
         """
         return f"https://www.youtube.com/playlist?list={playlist_id}"
     
-    def test_api_connection(self) -> bool:
+    def check_quota_usage(self) -> Dict[str, Any]:
         """
-        Test if API connection is working
+        Check current quota usage (approximation)
         
         Returns:
-            True if API is accessible, False otherwise
+            Dictionary with quota information
         """
-        try:
-            # Simple test - search for a common term
-            search_response = self.youtube.search().list(
-                q="test",
-                part="id",
-                maxResults=1,
-                type="video"
-            ).execute()
-            
-            logger.info("YouTube API connection test successful")
-            return True
-            
-        except Exception as e:
-            logger.error(f"YouTube API connection test failed: {e}")
-            return False
+        # This is an approximation as YouTube doesn't provide real-time quota info
+        return {
+            "search_cost": 100,  # units per search
+            "playlist_creation_cost": 50,  # units per playlist
+            "playlist_item_cost": 50,  # units per video added
+            "note": "YouTube API has a default quota of 10,000 units per day"
+        }

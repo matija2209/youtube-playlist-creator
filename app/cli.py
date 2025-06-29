@@ -1,6 +1,7 @@
 import click
 from pathlib import Path
 from .services.playlist_creator import PlaylistCreatorService
+from .services.oauth_service import YouTubeOAuthService
 from config import Config
 import logging
 
@@ -27,7 +28,9 @@ def cli():
 @click.option('--privacy', '-p', default='private', 
               type=click.Choice(['private', 'public', 'unlisted']), 
               help='Playlist privacy setting')
-def create(list_files, file, playlist_name, privacy):
+@click.option('--dry-run', '-d', is_flag=True, help='Demo mode - search for videos without creating playlist')
+@click.option('--oauth', '-o', is_flag=True, help='Use OAuth2 authentication (required for real playlist creation)')
+def create(list_files, file, playlist_name, privacy, dry_run, oauth):
     """Create YouTube playlist from CSV file in csv_files folder"""
     
     if list_files:
@@ -48,17 +51,39 @@ def create(list_files, file, playlist_name, privacy):
         click.echo(f"🎵 Processing CSV file: {file}")
         click.echo(f"📁 Full path: {csv_path}")
         
-        service = PlaylistCreatorService()
-        result = service.process_csv_to_playlist(str(csv_path), playlist_name, privacy)
+        if dry_run:
+            click.echo("🔍 DRY RUN MODE - Searching for videos without creating playlist")
+            click.echo("="*60)
+        
+        # Check if trying to create real playlist without OAuth
+        if not dry_run and not oauth:
+            click.echo("⚠️ Warning: Real playlist creation requires OAuth2 authentication.")
+            click.echo("   Use --oauth flag to authenticate, or --dry-run to demo without creating playlist.")
+            if not click.confirm("Continue with dry-run mode?"):
+                return 1
+            dry_run = True
+        
+        service = PlaylistCreatorService(use_oauth=oauth)
+        
+        if dry_run:
+            # Demo mode - just search for videos
+            result = service.demo_playlist_creation(str(csv_path), playlist_name or "Demo Playlist")
+        else:
+            # Real mode - create playlist with OAuth2
+            result = service.process_csv_to_playlist(str(csv_path), playlist_name, privacy)
         
         # Display results
         click.echo("\n" + "="*50)
-        click.echo("🎉 PLAYLIST CREATION COMPLETE!")
+        if dry_run:
+            click.echo("🎯 DEMO PLAYLIST SEARCH COMPLETE!")
+        else:
+            click.echo("🎉 PLAYLIST CREATION COMPLETE!")
         click.echo("="*50)
         click.echo(f"📋 Playlist: {result.playlist_name}")
-        click.echo(f"🔗 URL: {result.playlist_url}")
+        if not dry_run and result.playlist_url:
+            click.echo(f"🔗 URL: {result.playlist_url}")
         click.echo(f"📊 Total songs processed: {result.total_songs}")
-        click.echo(f"✅ Successfully added: {result.added_count}")
+        click.echo(f"✅ Videos found: {result.added_count}")
         click.echo(f"❌ Not found: {result.not_found_count}")
         click.echo(f"🔄 Duplicates skipped: {result.duplicate_count}")
         
@@ -71,6 +96,10 @@ def create(list_files, file, playlist_name, privacy):
             click.echo(f"\n🔄 Duplicate songs skipped:")
             for song in result.duplicates:
                 click.echo(f"  - {song.title} by {song.artist}")
+                
+        if dry_run:
+            click.echo(f"\n💡 To create real playlists, OAuth2 authentication is required.")
+            click.echo(f"   This demo shows the {result.added_count} videos that would be added to the playlist.")
         
     except Exception as e:
         logger.error(f"Error creating playlist: {e}")
@@ -127,6 +156,7 @@ def test():
         
         if results['overall']:
             click.echo("🎉 All systems ready!")
+            click.echo("💡 Use --dry-run flag to demo playlist creation without OAuth2")
         else:
             click.echo("⚠️ Some services are not working properly")
             
@@ -158,9 +188,70 @@ def setup():
             click.echo("⚠️ Warning: Please set your YouTube API key in .env file")
         else:
             click.echo("✅ YouTube API key is configured")
+            click.echo("💡 Use --dry-run flag to demo functionality without OAuth2")
             
     except Exception as e:
         click.echo(f"❌ Configuration error: {e}", err=True)
+
+@cli.command()
+def auth_login():
+    """Authenticate with YouTube using OAuth2"""
+    click.echo("🔐 Starting YouTube OAuth2 authentication...")
+    
+    try:
+        oauth_service = YouTubeOAuthService()
+        credentials = oauth_service.authenticate()
+        
+        # Get user info to confirm authentication
+        user_info = oauth_service.get_user_info()
+        if user_info:
+            click.echo("✅ Authentication successful!")
+            click.echo(f"📺 Channel: {user_info.get('title', 'Unknown')}")
+            click.echo(f"👥 Subscribers: {user_info.get('subscriber_count', 'N/A')}")
+            click.echo(f"🎥 Videos: {user_info.get('video_count', 'N/A')}")
+        else:
+            click.echo("✅ Authentication successful!")
+        
+        click.echo("💡 You can now create playlists using --oauth flag")
+        
+    except FileNotFoundError as e:
+        click.echo(f"❌ Client secrets file not found: {e}")
+        click.echo("💡 Please ensure client_secrets.json is in the project root")
+    except Exception as e:
+        click.echo(f"❌ Authentication failed: {e}", err=True)
+
+@cli.command()
+def auth_status():
+    """Check OAuth2 authentication status"""
+    try:
+        oauth_service = YouTubeOAuthService()
+        
+        if oauth_service.is_authenticated():
+            click.echo("✅ You are authenticated with YouTube")
+            
+            # Get user info
+            user_info = oauth_service.get_user_info()
+            if user_info:
+                click.echo(f"📺 Channel: {user_info.get('title', 'Unknown')}")
+        else:
+            click.echo("❌ Not authenticated")
+            click.echo("💡 Run 'python -m app.cli auth-login' to authenticate")
+            
+    except FileNotFoundError:
+        click.echo("❌ OAuth2 not configured (client_secrets.json not found)")
+    except Exception as e:
+        click.echo(f"❌ Error checking status: {e}", err=True)
+
+@cli.command()
+def auth_logout():
+    """Revoke OAuth2 authentication"""
+    try:
+        oauth_service = YouTubeOAuthService()
+        oauth_service.revoke_authentication()
+        click.echo("✅ Successfully logged out")
+        
+    except Exception as e:
+        click.echo(f"❌ Error during logout: {e}", err=True)
 
 if __name__ == '__main__':
     cli()
