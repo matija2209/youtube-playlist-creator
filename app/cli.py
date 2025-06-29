@@ -253,5 +253,71 @@ def auth_logout():
     except Exception as e:
         click.echo(f"❌ Error during logout: {e}", err=True)
 
+@cli.command()
+@click.option('--file', '-f', help='CSV filename to estimate quota for')
+@click.option('--success-rate', '-s', default=0.8, type=float, help='Estimated success rate (0.0-1.0)')
+def estimate(file, success_rate):
+    """Estimate quota usage for processing a CSV file"""
+    
+    if not file:
+        click.echo("Available CSV files:")
+        _list_csv_files()
+        file = click.prompt("Enter CSV filename to estimate")
+    
+    csv_path = Config.CSV_FOLDER / file
+    if not csv_path.exists():
+        click.echo(f"❌ File not found: {csv_path}", err=True)
+        return 1
+    
+    try:
+        service = PlaylistCreatorService()
+        
+        # Parse CSV to get song count
+        songs = service.csv_parser.parse_csv(str(csv_path))
+        if not songs:
+            click.echo("❌ No valid songs found in CSV file")
+            return 1
+        
+        num_songs = len(songs)
+        
+        # Get quota estimation
+        quota_info = service.youtube_api.calculate_estimated_quota_usage(num_songs, success_rate)
+        
+        click.echo("\n" + "="*60)
+        click.echo("📊 QUOTA USAGE ESTIMATION")
+        click.echo("="*60)
+        click.echo(f"📄 File: {file}")
+        click.echo(f"🎵 Songs in CSV: {num_songs}")
+        click.echo(f"🎯 Estimated success rate: {success_rate*100:.0f}%")
+        click.echo(f"🎶 Expected videos found: {quota_info['estimated_found_songs']}")
+        
+        click.echo("\n💰 Quota Usage Breakdown:")
+        click.echo(f"  🔍 Search operations: {quota_info['breakdown']['search_operations']:,} units")
+        click.echo(f"  📝 Playlist creation: {quota_info['breakdown']['playlist_creation']:,} units")
+        click.echo(f"  ➕ Adding videos: {quota_info['breakdown']['adding_videos']:,} units")
+        click.echo(f"  🏆 TOTAL ESTIMATED: {quota_info['total_estimated_units']:,} units")
+        
+        click.echo(f"\n📈 Daily quota usage: {quota_info['quota_percentage']}% of 10,000 units")
+        
+        if quota_info['can_complete_today']:
+            click.echo("✅ Should complete within daily quota limit!")
+        else:
+            click.echo("⚠️  WARNING: This exceeds daily quota!")
+            click.echo(f"📅 Estimated days needed: {quota_info['days_needed']}")
+            click.echo("💡 Consider requesting quota increase or processing in smaller batches")
+        
+        click.echo("\n🔍 For demo mode (search only):")
+        demo_units = quota_info['breakdown']['search_operations']
+        demo_percentage = round((demo_units/10000)*100, 1)
+        click.echo(f"  Search only: {demo_units:,} units ({demo_percentage}% of daily quota)")
+        
+        click.echo("\n" + "="*60)
+        click.echo("💡 Use 'create --dry-run' to test searching without creating playlist")
+        click.echo("💡 Use 'create --oauth' to create real playlist (requires authentication)")
+        
+    except Exception as e:
+        click.echo(f"❌ Error estimating quota: {str(e)}", err=True)
+        return 1
+
 if __name__ == '__main__':
     cli()

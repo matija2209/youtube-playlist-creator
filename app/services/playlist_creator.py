@@ -4,6 +4,7 @@ from .csv_parser import CSVParserService
 from .youtube_api import YouTubeAPIService
 from config import Config
 import logging
+import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,65 @@ class PlaylistCreatorService:
         self.use_oauth = use_oauth
         logger.info(f"PlaylistCreatorService initialized (OAuth: {use_oauth})")
     
+    def estimate_quota_and_confirm(self, num_songs: int, playlist_name: str, is_demo: bool = False) -> bool:
+        """
+        Estimate quota usage and get user confirmation before processing
+        
+        Args:
+            num_songs: Number of songs to process
+            playlist_name: Name of the playlist
+            is_demo: Whether this is a demo run
+            
+        Returns:
+            True if user confirms, False if user cancels
+        """
+        quota_info = self.youtube_api.calculate_estimated_quota_usage(num_songs)
+        
+        print("\n" + "="*60)
+        print("📊 QUOTA USAGE ESTIMATION")
+        print("="*60)
+        print(f"🎵 Playlist: {playlist_name}")
+        print(f"📁 Songs to process: {num_songs}")
+        print(f"🎯 Estimated success rate: {quota_info['estimated_success_rate']*100:.0f}%")
+        print(f"🎶 Expected videos found: {quota_info['estimated_found_songs']}")
+        
+        if is_demo:
+            print(f"🔍 Demo mode: Only searching (no playlist creation)")
+        
+        print("\n💰 Quota Usage Breakdown:")
+        print(f"  • Search operations: {quota_info['breakdown']['search_operations']:,} units")
+        if not is_demo:
+            print(f"  • Playlist creation: {quota_info['breakdown']['playlist_creation']:,} units")
+            print(f"  • Adding videos: {quota_info['breakdown']['adding_videos']:,} units")
+        
+        total_units = quota_info['breakdown']['search_operations']
+        if not is_demo:
+            total_units = quota_info['total_estimated_units']
+            
+        print(f"  • TOTAL ESTIMATED: {total_units:,} units")
+        print(f"\n📈 Daily quota usage: {round((total_units/10000)*100, 1)}% of 10,000 units")
+        
+        if total_units > 10000:
+            print(f"⚠️  WARNING: This exceeds daily quota!")
+            print(f"📅 Estimated days needed: {max(1, round(total_units/10000, 1))}")
+            print(f"💡 Consider requesting quota increase or processing in smaller batches")
+        else:
+            print(f"✅ Should complete within daily quota limit")
+        
+        print("\n" + "="*60)
+        
+        # Get user confirmation
+        while True:
+            choice = input("🤔 Do you want to continue? (y/n): ").lower().strip()
+            if choice in ['y', 'yes']:
+                print("✅ Proceeding with playlist processing...")
+                return True
+            elif choice in ['n', 'no']:
+                print("❌ Operation cancelled by user.")
+                return False
+            else:
+                print("Please enter 'y' for yes or 'n' for no.")
+    
     def process_csv_to_playlist(self, csv_file_path: str, playlist_name: str = None, privacy_status: str = "private") -> PlaylistSummary:
         """
         Complete process: Parse CSV, search videos, create playlist
@@ -37,7 +97,7 @@ class PlaylistCreatorService:
         """
         logger.info(f"Starting playlist creation from CSV: {csv_file_path}")
         
-        # Parse CSV file
+        # Parse CSV file first to get song count
         try:
             songs = self.csv_parser.parse_csv(csv_file_path)
             if not songs:
@@ -50,6 +110,10 @@ class PlaylistCreatorService:
         if not playlist_name:
             csv_filename = Path(csv_file_path).stem
             playlist_name = f"Playlist from {csv_filename}"
+        
+        # Estimate quota and get user confirmation
+        if not self.estimate_quota_and_confirm(len(songs), playlist_name, is_demo=False):
+            raise Exception("Operation cancelled by user")
         
         # Create YouTube playlist
         playlist_id = self.youtube_api.create_playlist(
@@ -77,7 +141,7 @@ class PlaylistCreatorService:
         """
         logger.info(f"Starting demo playlist creation from CSV: {csv_file_path}")
         
-        # Parse CSV file
+        # Parse CSV file first to get song count
         try:
             songs = self.csv_parser.parse_csv(csv_file_path)
             if not songs:
@@ -90,6 +154,10 @@ class PlaylistCreatorService:
         if not playlist_name:
             csv_filename = Path(csv_file_path).stem
             playlist_name = f"Demo Playlist from {csv_filename}"
+        
+        # Estimate quota and get user confirmation
+        if not self.estimate_quota_and_confirm(len(songs), playlist_name, is_demo=True):
+            raise Exception("Operation cancelled by user")
         
         # Demo mode - just search for videos without creating playlist
         return self._demo_search_songs(songs, playlist_name)
@@ -114,6 +182,10 @@ class PlaylistCreatorService:
         
         for i, song in enumerate(songs, 1):
             logger.info(f"Demo: Searching song {i}/{len(songs)}: {song}")
+            
+            # Add delay between songs to avoid rate limiting
+            if i > 1:
+                time.sleep(2.0)  # 2 second delay between songs
             
             try:
                 # Search for video
@@ -176,6 +248,10 @@ class PlaylistCreatorService:
         
         for i, song in enumerate(songs, 1):
             logger.info(f"Processing song {i}/{len(songs)}: {song}")
+            
+            # Add delay between songs to avoid rate limiting
+            if i > 1:
+                time.sleep(2.0)  # 2 second delay between songs
             
             try:
                 # Search for video

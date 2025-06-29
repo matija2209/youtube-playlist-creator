@@ -2,6 +2,7 @@
 YouTube API Service - handles YouTube Data API v3 operations
 """
 import logging
+import time
 from typing import List, Optional, Dict, Any
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -121,32 +122,25 @@ class YouTubeAPIService:
         Returns:
             Best matching video dictionary or None if not found
         """
-        # Try different search queries to find the best match
-        search_queries = [
-            f"{title} {artist}",
-            f"{artist} {title}",
-            f"{title} by {artist}",
-            f"{artist} - {title}",
-            f'"{title}" "{artist}"'
-        ]
+        # Use simple "title artist" format for optimal quota usage
+        query = f"{title} {artist}"
         
-        for query in search_queries:
-            videos = self.search_videos(query, max_results)
-            
-            if videos:
-                # Simple scoring: prefer videos with both title and artist in the name
-                for video in videos:
-                    video_title_lower = video['title'].lower()
-                    title_lower = title.lower()
-                    artist_lower = artist.lower()
-                    
-                    if title_lower in video_title_lower and artist_lower in video_title_lower:
-                        logger.info(f"Found video for '{title} by {artist}': {video['title']}")
-                        return video
+        videos = self.search_videos(query, max_results)
+        
+        if videos:
+            # Simple scoring: prefer videos with both title and artist in the name
+            for video in videos:
+                video_title_lower = video['title'].lower()
+                title_lower = title.lower()
+                artist_lower = artist.lower()
                 
-                # If no perfect match, return the first result
-                logger.info(f"Found video for '{title} by {artist}': {videos[0]['title']}")
-                return videos[0]
+                if title_lower in video_title_lower and artist_lower in video_title_lower:
+                    logger.info(f"Found video for '{title} by {artist}': {video['title']}")
+                    return video
+            
+            # If no perfect match, return the first result
+            logger.info(f"Found video for '{title} by {artist}': {videos[0]['title']}")
+            return videos[0]
         
         logger.warning(f"No suitable video found for: {title} by {artist}")
         return None
@@ -263,4 +257,43 @@ class YouTubeAPIService:
             "playlist_creation_cost": 50,  # units per playlist
             "playlist_item_cost": 50,  # units per video added
             "note": "YouTube API has a default quota of 10,000 units per day"
+        }
+
+    def calculate_estimated_quota_usage(self, num_songs: int, estimated_success_rate: float = 0.8) -> Dict[str, Any]:
+        """
+        Calculate estimated quota usage for processing a given number of songs
+        
+        Args:
+            num_songs: Number of songs to process
+            estimated_success_rate: Estimated percentage of songs that will be found (0.0-1.0)
+            
+        Returns:
+            Dictionary with quota usage breakdown
+        """
+        # Search operations (one per song)
+        search_units = num_songs * 100
+        
+        # Playlist creation (one per playlist)
+        playlist_creation_units = 50
+        
+        # Adding videos to playlist (estimated based on success rate)
+        estimated_found_songs = int(num_songs * estimated_success_rate)
+        playlist_item_units = estimated_found_songs * 50
+        
+        total_estimated_units = search_units + playlist_creation_units + playlist_item_units
+        
+        return {
+            "num_songs": num_songs,
+            "estimated_success_rate": estimated_success_rate,
+            "estimated_found_songs": estimated_found_songs,
+            "breakdown": {
+                "search_operations": search_units,
+                "playlist_creation": playlist_creation_units,
+                "adding_videos": playlist_item_units
+            },
+            "total_estimated_units": total_estimated_units,
+            "daily_quota_limit": 10000,
+            "quota_percentage": round((total_estimated_units / 10000) * 100, 1),
+            "can_complete_today": total_estimated_units <= 10000,
+            "days_needed": max(1, round(total_estimated_units / 10000, 1))
         }
